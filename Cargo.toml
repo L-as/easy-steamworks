@@ -1,0 +1,7 @@
+[package]
+name = "easy-steamworks"
+version = "0.1.0"
+authors = ["Las <las@protonmail.ch>"]
+edition = "2018"
+
+[dependencies]
