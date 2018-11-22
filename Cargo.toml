@@ -5,3 +5,5 @@ authors = ["Las <las@protonmail.ch>"]
 edition = "2018"
 
 [dependencies]
+derive_more = "0.13"
+erroneous = {git = "https://github.com/Laaas/erroneous.git", rev = "0f2453e4bbfe590f1a26371d6c299adb4ca66b40"}
