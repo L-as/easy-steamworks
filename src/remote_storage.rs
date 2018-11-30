@@ -22,7 +22,7 @@ use crate::{
 };
 
 #[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Item(pub u64);
 
 #[repr(transparent)]
