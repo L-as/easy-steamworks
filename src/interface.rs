@@ -12,8 +12,8 @@ pub(crate) struct Raw<'a, T: Interface<'a>>(*mut InterfaceData, PhantomData<&'a 
 pub(crate) struct RawRef<'a, T: Interface<'a>>(*mut InterfaceData, PhantomData<&'a T>);
 
 impl<'a, T: Interface<'a>> Raw<'a, T> {
-	pub(crate) fn as_ref(&self) -> Result<T, ()> {
-		unsafe {self.0.as_ref().map(T::from_raw).ok_or(())}
+	pub(crate) fn as_ref(&self) -> Option<T> {
+		unsafe {self.0.as_ref().map(T::from_raw)}
 	}
 	pub(crate) unsafe fn from_raw(p: *mut InterfaceData) -> Self {
 		Raw(p, PhantomData)

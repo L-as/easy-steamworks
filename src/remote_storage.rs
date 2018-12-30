@@ -2,8 +2,9 @@ use std::{
 	os::raw::c_char,
 	marker::PhantomData,
 	ffi::CStr,
-	task::Poll,
 };
+
+use futures::{Poll, Async};
 
 use crate::{
 	APICall,
@@ -45,7 +46,7 @@ pub enum FileType {
 
 interface!(RemoteStorage);
 impl<'a> RemoteStorage<'a> {
-	pub fn new(client: &'a Client<'a>) -> Result<Self, ()> {
+	pub fn new<'b: 'a>(client: &'b Client<'a>) -> Option<Self> {
 		let storage = unsafe {
 			SteamAPI_ISteamClient_GetISteamRemoteStorage(
 				client.into(),
@@ -58,7 +59,7 @@ impl<'a> RemoteStorage<'a> {
 		storage.as_ref()
 	}
 
-	pub fn file_write(&'a mut self, name: &CStr, data: impl AsRef<[u8]>) -> Result<(), ()> {
+	pub fn file_write(&self, name: &CStr, data: impl AsRef<[u8]>) -> Result<(), ()> {
 		let data = data.as_ref();
 		if unsafe {
 			SteamAPI_ISteamRemoteStorage_FileWrite(
@@ -74,7 +75,7 @@ impl<'a> RemoteStorage<'a> {
 		}
 	}
 
-	pub fn file_delete(&'a mut self, name: &CStr) -> Result<(), ()> {
+	pub fn file_delete(&self, name: &CStr) -> Result<(), ()> {
 		if unsafe {
 			SteamAPI_ISteamRemoteStorage_FileDelete(
 				(&*self).into(),
@@ -88,14 +89,14 @@ impl<'a> RemoteStorage<'a> {
 	}
 
 	pub fn publish(
-		&'a mut self,
+		&'a self,
 		appid: u32,
 		contents_path: &CStr,
 		preview_path: &CStr,
 		title: &CStr,
 		description: &CStr,
 		tags: &[impl AsRef<CStr>],
-	) -> impl SteamFuture<Output = Result<Item, Error>> + 'a {
+	) -> impl SteamFuture<Item = Item> + 'a {
 		#[repr(packed)]
 		struct Data {
 			pub result:       RawResult,
@@ -110,20 +111,19 @@ impl<'a> RemoteStorage<'a> {
 		struct Handle<'a>(APICall<'a>);
 
 		impl<'a> SteamFuture for Handle<'a> {
-			type Output = Result<Item, Error>;
-			fn poll(&mut self, utils: &mut Utils) -> Poll<Self::Output> {
+			type Item = Item;
+			fn poll(&mut self, utils: &Utils) -> Poll<Self::Item, Error> {
 				if utils.is_apicall_completed(self.0) {
 					let data: Result<Data, _> = unsafe {utils.get_apicall_result(self.0)};
-					Poll::Ready(
-						data
-							.map_err(|_| Error::Fail)
-							.and_then(|Data {result, item, accept_agreement}| {
-								assert!(!accept_agreement);
-								Result::from(result).map(|_| item)
-							})
-					)
+					data
+						.map_err(|_| Error::Fail)
+						.and_then(|Data {result, item, accept_agreement}| {
+							assert!(!accept_agreement);
+							Result::from(result).map(|_| item)
+						})
+						.map(Async::Ready)
 				} else {
-					Poll::Pending
+					Ok(Async::NotReady)
 				}
 			}
 		}
@@ -148,7 +148,7 @@ impl<'a> RemoteStorage<'a> {
 	}
 
 	pub fn update(
-		&'a mut self,
+		&'a self,
 		item: Item,
 	) -> ItemUpdater<'a> {
 		let update_handle = unsafe {
@@ -187,7 +187,7 @@ macro_rules! item_updater_methods {
 }
 
 impl<'a> ItemUpdater<'a> {
-	pub fn finish(self) -> impl SteamFuture<Output = Result<Item, Error>> + 'a {
+	pub fn finish(self) -> impl SteamFuture<Item = Item> + 'a {
 		#[repr(packed)]
 		struct Data {
 			pub result:       RawResult,
@@ -202,20 +202,20 @@ impl<'a> ItemUpdater<'a> {
 		struct Handle<'a>(APICall<'a>);
 
 		impl<'a> SteamFuture for Handle<'a> {
-			type Output = Result<Item, Error>;
-			fn poll(&mut self, utils: &mut Utils) -> Poll<Self::Output> {
+			type Item = Item;
+			fn poll(&mut self, utils: &Utils) -> Poll<Self::Item, Error> {
 				if utils.is_apicall_completed(self.0) {
-					let data: Result<Data, _> = unsafe {utils.get_apicall_result(self.0)};
-					Poll::Ready(
-						data
-							.map_err(|_| Error::Fail)
-							.and_then(|Data {result, item, accept_agreement}| {
-								assert!(!accept_agreement);
-								Result::from(result).map(|_| item)
-							})
-					)
+					let data: Result<Data, ()> = unsafe {utils.get_apicall_result(self.0)};
+					data
+						.map_err(|_| Error::Fail)
+						.and_then(|Data {result, item, accept_agreement}| {
+							// FIXME
+							assert!(!accept_agreement);
+							Result::from(result).map(|_| item)
+						})
+						.map(Async::Ready)
 				} else {
-					Poll::Pending
+					Ok(Async::NotReady)
 				}
 			}
 		}

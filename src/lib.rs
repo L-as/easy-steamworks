@@ -1,8 +1,3 @@
-#![feature(maybe_uninit)]
-#![feature(futures_api)]
-#![feature(pin)]
-#![feature(arbitrary_self_types)]
-
 #[macro_use]
 mod macros;
 #[macro_use]

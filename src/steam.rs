@@ -1,15 +1,20 @@
 use std::{
 	marker::PhantomData,
 	os::raw::c_char,
+	sync::Mutex,
 };
-
+use lazy_static::lazy_static;
 use crate::Raw;
 
-pub struct Steam;
+pub struct Steam {}
+lazy_static! {
+	pub static ref STEAM: Mutex<Steam> = Mutex::new(Steam {});
+}
+
 impl Steam {
-	pub fn new_client<'a>(&'a mut self) -> Result<Client<'a>, ()> {
+	pub fn new_client<'a>(&'a mut self) -> Option<Client<'a>> {
 		if unsafe { !SteamAPI_Init() } {
-			return Err(());
+			return None;
 		}
 
 		let client: Raw<Client<'a>> = unsafe {

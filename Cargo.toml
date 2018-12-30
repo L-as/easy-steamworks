@@ -7,3 +7,8 @@ edition = "2018"
 [dependencies]
 derive_more = "0.13"
 erroneous = {git = "https://github.com/Laaas/erroneous.git", rev = "0f2453e4bbfe590f1a26371d6c299adb4ca66b40"}
+futures = "0.1.25"
+lazy_static = "1"
+
+[dev-dependencies]
+const-cstr = "0.3"
