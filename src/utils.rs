@@ -3,11 +3,7 @@ use std::{
 	mem::{size_of, zeroed},
 };
 
-use crate::{
-	Client,
-	Raw,
-	Interface,
-};
+use crate::{Client, Interface, Raw};
 
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,7 +15,7 @@ pub unsafe trait APICallResult {
 
 #[derive(Clone)]
 pub struct Utils<'a> {
-	pub(crate) raw: Raw<Utils<'a>>,
+	pub(crate) raw:     Raw<Utils<'a>>,
 	pub(crate) _marker: PhantomData<&'a ()>,
 }
 
@@ -32,7 +28,9 @@ impl<'a> Utils<'a> {
 
 	pub fn is_apicall_completed(&self, call: APICall<'_>) -> bool {
 		let mut b = false;
-		unsafe { SteamAPI_ISteamUtils_IsAPICallCompleted(self.raw.clone(), call, &mut b as *mut bool) }
+		unsafe {
+			SteamAPI_ISteamUtils_IsAPICallCompleted(self.raw.clone(), call, &mut b as *mut bool)
+		}
 	}
 
 	pub unsafe fn get_apicall_result<T: APICallResult>(&self, call: APICall<'_>) -> Result<T, ()> {

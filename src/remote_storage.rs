@@ -1,25 +1,21 @@
-use std::{
-	os::raw::c_char,
-	marker::PhantomData,
-	ffi::CStr,
-};
 use const_cstr::const_cstr;
+use std::{ffi::CStr, marker::PhantomData, os::raw::c_char};
 
-use futures::{Future, Poll, Async};
+use futures::{Async, Future, Poll};
 
 use crate::{
 	APICall,
+	APICallResult,
 	Client,
 	Error,
-	User,
+	MaybeRaw,
 	Pipe,
 	Raw,
-	MaybeRaw,
-	StringsContainer,
-	Strings,
-	Utils,
 	RawResult,
-	APICallResult,
+	Strings,
+	StringsContainer,
+	User,
+	Utils,
 };
 
 #[repr(transparent)]
@@ -34,7 +30,7 @@ struct UpdateHandle<'a>(u64, PhantomData<&'a ()>);
 pub enum Visibility {
 	Public,
 	FriendsOnly,
-	Private
+	Private,
 }
 
 #[repr(u32)]
@@ -53,11 +49,12 @@ impl<'a> RemoteStorage<'a> {
 				client.user(),
 				client.pipe(),
 				const_cstr!("STEAMREMOTESTORAGE_INTERFACE_VERSION014\0").as_ptr(),
-			).check()?
+			)
+			.check()?
 		};
 		let utils = client.utils.clone();
 
-		Some(RemoteStorage {raw, utils})
+		Some(RemoteStorage { raw, utils })
 	}
 
 	pub fn file_write(&self, name: &CStr, data: impl AsRef<[u8]>) -> Result<(), ()> {
@@ -77,12 +74,7 @@ impl<'a> RemoteStorage<'a> {
 	}
 
 	pub fn file_delete(&self, name: &CStr) -> Result<(), ()> {
-		if unsafe {
-			SteamAPI_ISteamRemoteStorage_FileDelete(
-				self.raw.clone(),
-				name.as_ptr(),
-			)
-		} {
+		if unsafe { SteamAPI_ISteamRemoteStorage_FileDelete(self.raw.clone(), name.as_ptr()) } {
 			Ok(())
 		} else {
 			Err(())
@@ -111,21 +103,28 @@ impl<'a> RemoteStorage<'a> {
 
 		struct Handle<'a> {
 			api_call: APICall<'a>,
-			utils: Utils<'a>,
+			utils:    Utils<'a>,
 		}
 
 		impl Future for Handle<'_> {
-			type Item = Item;
 			type Error = Error;
+			type Item = Item;
+
 			fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
 				if self.utils.is_apicall_completed(self.api_call) {
-					let data: Result<Data, _> = unsafe {self.utils.get_apicall_result(self.api_call)};
-					data
-						.map_err(|_| Error::Fail)
-						.and_then(|Data {result, item, accept_agreement}| {
-							assert!(!accept_agreement);
-							Result::from(result).map(|_| item)
-						})
+					let data: Result<Data, _> =
+						unsafe { self.utils.get_apicall_result(self.api_call) };
+					data.map_err(|_| Error::Fail)
+						.and_then(
+							|Data {
+							     result,
+							     item,
+							     accept_agreement,
+							 }| {
+								assert!(!accept_agreement);
+								Result::from(result).map(|_| item)
+							},
+						)
 						.map(Async::Ready)
 				} else {
 					Ok(Async::NotReady)
@@ -149,26 +148,26 @@ impl<'a> RemoteStorage<'a> {
 			)
 		};
 
-		Handle {api_call, utils: self.utils.clone()}
+		Handle {
+			api_call,
+			utils: self.utils.clone(),
+		}
 	}
 
-	pub fn update(
-		&'a self,
-		item: Item,
-	) -> ItemUpdater<'a> {
+	pub fn update(&'a self, item: Item) -> ItemUpdater<'a> {
 		let update_handle = unsafe {
-			SteamAPI_ISteamRemoteStorage_CreatePublishedFileUpdateRequest(
-				self.raw.clone(),
-				item,
-			)
+			SteamAPI_ISteamRemoteStorage_CreatePublishedFileUpdateRequest(self.raw.clone(), item)
 		};
-		ItemUpdater {remote_storage: self, update_handle}
+		ItemUpdater {
+			remote_storage: self,
+			update_handle,
+		}
 	}
 }
 
 pub struct ItemUpdater<'a> {
 	remote_storage: &'a RemoteStorage<'a>,
-	update_handle: UpdateHandle<'a>,
+	update_handle:  UpdateHandle<'a>,
 }
 
 macro_rules! item_updater_methods {
@@ -192,6 +191,14 @@ macro_rules! item_updater_methods {
 }
 
 impl<'a> ItemUpdater<'a> {
+	item_updater_methods!(
+		file SteamAPI_ISteamRemoteStorage_UpdatePublishedFileFile;
+		preview SteamAPI_ISteamRemoteStorage_UpdatePublishedFilePreviewFile;
+		description SteamAPI_ISteamRemoteStorage_UpdatePublishedFileDescription;
+		change_description SteamAPI_ISteamRemoteStorage_UpdatePublishedFileSetChangeDescription;
+		title SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTitle;
+	);
+
 	pub fn finish(self) -> impl Future<Item = Item, Error = Error> + 'a {
 		#[repr(packed)]
 		struct Data {
@@ -206,28 +213,34 @@ impl<'a> ItemUpdater<'a> {
 
 		struct Handle<'a> {
 			api_call: APICall<'a>,
-			utils: Utils<'a>,
+			utils:    Utils<'a>,
 		}
 
 		impl Future for Handle<'_> {
-			type Item = Item;
 			type Error = Error;
+			type Item = Item;
+
 			fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
 				if self.utils.is_apicall_completed(self.api_call) {
-					let data: Result<Data, _> = unsafe {self.utils.get_apicall_result(self.api_call)};
-					data
-						.map_err(|_| Error::Fail)
-						.and_then(|Data {result, item, accept_agreement}| {
-							assert!(!accept_agreement);
-							Result::from(result).map(|_| item)
-						})
+					let data: Result<Data, _> =
+						unsafe { self.utils.get_apicall_result(self.api_call) };
+					data.map_err(|_| Error::Fail)
+						.and_then(
+							|Data {
+							     result,
+							     item,
+							     accept_agreement,
+							 }| {
+								assert!(!accept_agreement);
+								Result::from(result).map(|_| item)
+							},
+						)
 						.map(Async::Ready)
 				} else {
 					Ok(Async::NotReady)
 				}
 			}
 		}
-
 
 		let api_call = unsafe {
 			SteamAPI_ISteamRemoteStorage_CommitPublishedFileUpdate(
@@ -236,15 +249,12 @@ impl<'a> ItemUpdater<'a> {
 			)
 		};
 
-		Handle {api_call, utils: self.remote_storage.utils.clone()}
+		Handle {
+			api_call,
+			utils: self.remote_storage.utils.clone(),
+		}
 	}
-	item_updater_methods!(
-		file SteamAPI_ISteamRemoteStorage_UpdatePublishedFileFile;
-		preview SteamAPI_ISteamRemoteStorage_UpdatePublishedFilePreviewFile;
-		description SteamAPI_ISteamRemoteStorage_UpdatePublishedFileDescription;
-		change_description SteamAPI_ISteamRemoteStorage_UpdatePublishedFileSetChangeDescription;
-		title SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTitle;
-	);
+
 	pub fn tags(self, tags: &[impl AsRef<CStr>]) -> Result<Self, ()> {
 		let tags = StringsContainer::from(tags.iter().map(|t| t.as_ref()));
 		if unsafe {

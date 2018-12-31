@@ -1,8 +1,6 @@
-use std::marker::PhantomData;
-use std::ffi::c_void;
-use std::ptr::NonNull;
+use std::{ffi::c_void, marker::PhantomData, ptr::NonNull};
 
-pub(crate) trait Interface : Sized {}
+pub(crate) trait Interface: Sized {}
 
 #[repr(transparent)]
 pub(crate) struct Raw<T: Interface>(NonNull<c_void>, PhantomData<T>);
@@ -19,7 +17,7 @@ impl<T: Interface> MaybeRaw<T> {
 		if self.0.is_null() {
 			None
 		} else {
-			unsafe {Some(Raw(NonNull::new_unchecked(self.0), PhantomData))}
+			unsafe { Some(Raw(NonNull::new_unchecked(self.0), PhantomData)) }
 		}
 	}
 }
@@ -34,7 +32,7 @@ macro_rules! interface {
 	($name:ident) => {
 		#[derive(Clone)]
 		pub struct $name<'a> {
-			pub(crate) raw: crate::Raw<$name<'a>>,
+			pub(crate) raw:   crate::Raw<$name<'a>>,
 			pub(crate) utils: crate::Utils<'a>,
 		}
 		impl crate::Interface for $name<'_> {}

@@ -141,7 +141,7 @@ pub enum Error {
 	#[display(fmt = "Account is locked down")]
 	AccountLockedDown,
 	#[display(fmt = "Account log-in was denied due to no verified e-mail")]
-	AccountLogonDeniedVerifiedEmailRequired ,
+	AccountLogonDeniedVerifiedEmailRequired,
 	#[display(fmt = "No URL matches")]
 	NoMatchingURL,
 	#[display(fmt = "Bad response")]
