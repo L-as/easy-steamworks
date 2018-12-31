@@ -1,42 +1,42 @@
 use std::marker::PhantomData;
+use std::ffi::c_void;
+use std::ptr::NonNull;
 
-pub(crate) trait Interface<'a> : Sized {
-	fn from_raw(p: &'a InterfaceData) -> Self;
-	fn into_raw(&'a self) -> &'a crate::InterfaceData;
-}
+pub(crate) trait Interface : Sized {}
 
-pub(crate) enum InterfaceData {}
 #[repr(transparent)]
-pub(crate) struct Raw<'a, T: Interface<'a>>(*mut InterfaceData, PhantomData<&'a mut T>);
-#[repr(transparent)]
-pub(crate) struct RawRef<'a, T: Interface<'a>>(*mut InterfaceData, PhantomData<&'a T>);
-
-impl<'a, T: Interface<'a>> Raw<'a, T> {
-	pub(crate) fn as_ref(&self) -> Option<T> {
-		unsafe {self.0.as_ref().map(T::from_raw)}
-	}
-	pub(crate) unsafe fn from_raw(p: *mut InterfaceData) -> Self {
-		Raw(p, PhantomData)
+pub(crate) struct Raw<T: Interface>(NonNull<c_void>, PhantomData<T>);
+impl<T: Interface> Clone for Raw<T> {
+	fn clone(&self) -> Self {
+		Raw(self.0, PhantomData)
 	}
 }
 
-impl<'a, T: Interface<'a>> From<&'a T> for RawRef<'a, T> {
-	fn from(t: &'a T) -> Self {
-		RawRef(t.into_raw() as *const _ as *mut _, PhantomData)
+#[repr(transparent)]
+pub(crate) struct MaybeRaw<T: Interface>(*mut c_void, PhantomData<T>);
+impl<T: Interface> MaybeRaw<T> {
+	pub(crate) fn check(self) -> Option<Raw<T>> {
+		if self.0.is_null() {
+			None
+		} else {
+			unsafe {Some(Raw(NonNull::new_unchecked(self.0), PhantomData))}
+		}
+	}
+}
+
+impl<T: Interface> From<*mut c_void> for MaybeRaw<T> {
+	fn from(p: *mut c_void) -> Self {
+		MaybeRaw(p, PhantomData)
 	}
 }
 
 macro_rules! interface {
 	($name:ident) => {
-		#[repr(transparent)]
-		pub struct $name<'a>(&'a crate::InterfaceData);
-		impl<'a> crate::Interface<'a> for $name<'a> {
-			fn from_raw(p: &'a crate::InterfaceData) -> $name<'a> {
-				$name(p)
-			}
-			fn into_raw(&'a self) -> &'a crate::InterfaceData {
-				self.0
-			}
+		#[derive(Clone)]
+		pub struct $name<'a> {
+			pub(crate) raw: crate::Raw<$name<'a>>,
+			pub(crate) utils: crate::Utils<'a>,
 		}
+		impl crate::Interface for $name<'_> {}
 	};
 }
