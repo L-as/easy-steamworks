@@ -7,6 +7,7 @@ use crate::{
 	APICall,
 	Client,
 	Error,
+	MaybeAPICall,
 	MaybeRaw,
 	Pipe,
 	Raw,
@@ -59,7 +60,7 @@ impl<'a> RemoteStorage<'a> {
 		&'a self,
 		name: &CStr,
 		data: impl AsRef<[u8]>,
-	) -> impl Future<Item = (), Error = Error> + 'a {
+	) -> Option<impl Future<Item = (), Error = Error> + 'a> {
 		declare_future! {
 			Data (1331) {
 				result: RawResult,
@@ -78,10 +79,10 @@ impl<'a> RemoteStorage<'a> {
 			)
 		};
 
-		Handle {
-			api_call,
-			utils: self.utils.clone(),
-		}
+		Some(Handle {
+			api_call: unsafe { APICall::new(api_call)? },
+			utils:    self.utils.clone(),
+		})
 	}
 
 	pub fn file_delete(&self, name: &CStr) -> Result<(), ()> {
@@ -100,7 +101,7 @@ impl<'a> RemoteStorage<'a> {
 		title: &CStr,
 		description: &CStr,
 		tags: &[impl AsRef<CStr>],
-	) -> impl Future<Item = Item, Error = Error> + 'a {
+	) -> Option<impl Future<Item = Item, Error = Error> + 'a> {
 		declare_future! {
 			Data (1309) {
 				result:           RawResult,
@@ -136,10 +137,10 @@ impl<'a> RemoteStorage<'a> {
 			)
 		};
 
-		Handle {
-			api_call,
-			utils: self.utils.clone(),
-		}
+		Some(Handle {
+			api_call: unsafe { APICall::new(api_call)? },
+			utils:    self.utils.clone(),
+		})
 	}
 
 	pub fn update(&'a self, item: Item) -> ItemUpdater<'a> {
@@ -187,7 +188,7 @@ impl<'a> ItemUpdater<'a> {
 		title SteamAPI_ISteamRemoteStorage_UpdatePublishedFileTitle;
 	);
 
-	pub fn finish(self) -> impl Future<Item = Item, Error = Error> + 'a {
+	pub fn finish(self) -> Option<impl Future<Item = Item, Error = Error> + 'a> {
 		declare_future! {
 			Data (1316) {
 				result:           RawResult,
@@ -214,10 +215,10 @@ impl<'a> ItemUpdater<'a> {
 			)
 		};
 
-		Handle {
-			api_call,
-			utils: self.remote_storage.utils.clone(),
-		}
+		Some(Handle {
+			api_call: unsafe { APICall::new(api_call)? },
+			utils:    self.remote_storage.utils.clone(),
+		})
 	}
 
 	pub fn tags(self, tags: &[impl AsRef<CStr>]) -> Result<Self, ()> {
@@ -249,13 +250,13 @@ steam_extern! {
 		g: Visibility,
 		h: *const Strings,
 		i: FileType
-	) -> APICall<'a>;
+	) -> MaybeAPICall;
 
-	fn SteamAPI_ISteamRemoteStorage_FileWriteAsync<'a>(a: Raw<RemoteStorage<'a>>, b: *const c_char, c: *const u8, d: u32) -> APICall<'a>;
+	fn SteamAPI_ISteamRemoteStorage_FileWriteAsync<'a>(a: Raw<RemoteStorage<'a>>, b: *const c_char, c: *const u8, d: u32) -> MaybeAPICall;
 	fn SteamAPI_ISteamRemoteStorage_FileDelete<'a>(a: Raw<RemoteStorage<'a>>, b: *const c_char) -> bool;
 
 	fn SteamAPI_ISteamRemoteStorage_CreatePublishedFileUpdateRequest<'a>(a: Raw<RemoteStorage<'a>>, b: Item)      -> UpdateHandle<'a>;
-	fn SteamAPI_ISteamRemoteStorage_CommitPublishedFileUpdate<'a>(a: Raw<RemoteStorage<'a>>, b: UpdateHandle<'a>) -> APICall<'a>;
+	fn SteamAPI_ISteamRemoteStorage_CommitPublishedFileUpdate<'a>(a: Raw<RemoteStorage<'a>>, b: UpdateHandle<'a>) -> MaybeAPICall;
 
 	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFileFile<'a>(a: Raw<RemoteStorage<'a>>, b: UpdateHandle<'a>, c: *const c_char)                 -> bool;
 	fn SteamAPI_ISteamRemoteStorage_UpdatePublishedFilePreviewFile<'a>(a: Raw<RemoteStorage<'a>>, b: UpdateHandle<'a>, c: *const c_char)          -> bool;

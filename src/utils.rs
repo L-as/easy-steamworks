@@ -1,14 +1,24 @@
 use std::{
 	marker::PhantomData,
 	mem::{size_of, zeroed},
+	num::NonZeroU64,
 };
 
 use crate::{Client, Interface, Raw};
 
-// FIXME must be non-null
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct APICall<'a>(u64, PhantomData<&'a ()>);
+pub struct APICall<'a>(NonZeroU64, PhantomData<&'a ()>);
+
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MaybeAPICall(u64);
+
+impl APICall<'_> {
+	pub unsafe fn new(api_call: MaybeAPICall) -> Option<Self> {
+		NonZeroU64::new(api_call.0).map(|n| APICall(n, PhantomData))
+	}
+}
 
 pub unsafe trait APICallResult {
 	const ID: u32;
