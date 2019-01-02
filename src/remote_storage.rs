@@ -5,7 +5,6 @@ use futures::{Async, Future, Poll};
 
 use crate::{
 	APICall,
-	APICallResult,
 	Client,
 	Error,
 	MaybeRaw,
@@ -15,7 +14,6 @@ use crate::{
 	Strings,
 	StringsContainer,
 	User,
-	Utils,
 };
 
 #[repr(transparent)]
@@ -57,19 +55,32 @@ impl<'a> RemoteStorage<'a> {
 		Some(RemoteStorage { raw, utils })
 	}
 
-	pub fn file_write(&self, name: &CStr, data: impl AsRef<[u8]>) -> Result<(), ()> {
+	pub fn file_write(
+		&'a self,
+		name: &CStr,
+		data: impl AsRef<[u8]>,
+	) -> impl Future<Item = (), Error = Error> + 'a {
+		declare_future! {
+			Data (1331) {
+				result: RawResult,
+			} -> ();
+
+			map(|Data {result}| Result::from(result));
+		}
+
 		let data = data.as_ref();
-		if unsafe {
-			SteamAPI_ISteamRemoteStorage_FileWrite(
+		let api_call = unsafe {
+			SteamAPI_ISteamRemoteStorage_FileWriteAsync(
 				self.raw.clone(),
 				name.as_ptr(),
 				data.as_ptr(),
 				data.len() as u32,
 			)
-		} {
-			Ok(())
-		} else {
-			Err(())
+		};
+
+		Handle {
+			api_call,
+			utils: self.utils.clone(),
 		}
 	}
 
@@ -90,46 +101,23 @@ impl<'a> RemoteStorage<'a> {
 		description: &CStr,
 		tags: &[impl AsRef<CStr>],
 	) -> impl Future<Item = Item, Error = Error> + 'a {
-		#[repr(packed)]
-		struct Data {
-			pub result:       RawResult,
-			pub item:         Item,
-			accept_agreement: bool,
-		}
+		declare_future! {
+			Data (1309) {
+				result:           RawResult,
+				item:             Item,
+				accept_agreement: bool,
+			} -> Item;
 
-		unsafe impl APICallResult for Data {
-			const ID: u32 = 1309;
-		}
-
-		struct Handle<'a> {
-			api_call: APICall<'a>,
-			utils:    Utils<'a>,
-		}
-
-		impl Future for Handle<'_> {
-			type Error = Error;
-			type Item = Item;
-
-			fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-				if self.utils.is_apicall_completed(self.api_call) {
-					let data: Result<Data, _> =
-						unsafe { self.utils.get_apicall_result(self.api_call) };
-					data.map_err(|_| Error::Fail)
-						.and_then(
-							|Data {
-							     result,
-							     item,
-							     accept_agreement,
-							 }| {
-								assert!(!accept_agreement);
-								Result::from(result).map(|_| item)
-							},
-						)
-						.map(Async::Ready)
-				} else {
-					Ok(Async::NotReady)
+			map(
+				|Data {
+					result,
+					item,
+					accept_agreement,
+				}| {
+					assert!(!accept_agreement);
+					Result::from(result).map(|_| item)
 				}
-			}
+			);
 		}
 
 		let tags = StringsContainer::from(tags.iter().map(|t| t.as_ref()));
@@ -200,46 +188,23 @@ impl<'a> ItemUpdater<'a> {
 	);
 
 	pub fn finish(self) -> impl Future<Item = Item, Error = Error> + 'a {
-		#[repr(packed)]
-		struct Data {
-			pub result:       RawResult,
-			pub item:         Item,
-			accept_agreement: bool,
-		}
+		declare_future! {
+			Data (1316) {
+				result:           RawResult,
+				item:             Item,
+				accept_agreement: bool,
+			} -> Item;
 
-		unsafe impl APICallResult for Data {
-			const ID: u32 = 1309;
-		}
-
-		struct Handle<'a> {
-			api_call: APICall<'a>,
-			utils:    Utils<'a>,
-		}
-
-		impl Future for Handle<'_> {
-			type Error = Error;
-			type Item = Item;
-
-			fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-				if self.utils.is_apicall_completed(self.api_call) {
-					let data: Result<Data, _> =
-						unsafe { self.utils.get_apicall_result(self.api_call) };
-					data.map_err(|_| Error::Fail)
-						.and_then(
-							|Data {
-							     result,
-							     item,
-							     accept_agreement,
-							 }| {
-								assert!(!accept_agreement);
-								Result::from(result).map(|_| item)
-							},
-						)
-						.map(Async::Ready)
-				} else {
-					Ok(Async::NotReady)
+			map(
+				|Data {
+					result,
+					item,
+					accept_agreement,
+				}| {
+					assert!(!accept_agreement);
+					Result::from(result).map(|_| item)
 				}
-			}
+			);
 		}
 
 		let api_call = unsafe {
@@ -286,7 +251,7 @@ steam_extern! {
 		i: FileType
 	) -> APICall<'a>;
 
-	fn SteamAPI_ISteamRemoteStorage_FileWrite<'a>(a: Raw<RemoteStorage<'a>>, b: *const c_char, c: *const u8, d: u32) -> bool;
+	fn SteamAPI_ISteamRemoteStorage_FileWriteAsync<'a>(a: Raw<RemoteStorage<'a>>, b: *const c_char, c: *const u8, d: u32) -> APICall<'a>;
 	fn SteamAPI_ISteamRemoteStorage_FileDelete<'a>(a: Raw<RemoteStorage<'a>>, b: *const c_char) -> bool;
 
 	fn SteamAPI_ISteamRemoteStorage_CreatePublishedFileUpdateRequest<'a>(a: Raw<RemoteStorage<'a>>, b: Item)      -> UpdateHandle<'a>;

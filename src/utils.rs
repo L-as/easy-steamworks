@@ -5,6 +5,7 @@ use std::{
 
 use crate::{Client, Interface, Raw};
 
+// FIXME must be non-null
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct APICall<'a>(u64, PhantomData<&'a ()>);
