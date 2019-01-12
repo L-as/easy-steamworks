@@ -36,6 +36,8 @@ macro_rules! declare_future {
 			type Item = $outty;
 
 			fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+				use futures::task;
+
 				if self.utils.is_apicall_completed(self.api_call) {
 					let data: Result<Data, _> =
 						unsafe { self.utils.get_apicall_result(self.api_call) };
@@ -43,6 +45,7 @@ macro_rules! declare_future {
 						.and_then($map)
 						.map(Async::Ready)
 				} else {
+					task::current().notify();
 					Ok(Async::NotReady)
 				}
 			}
