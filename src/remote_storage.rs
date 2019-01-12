@@ -1,4 +1,5 @@
 use const_cstr::const_cstr;
+use derive_more::{Display, LowerHex, UpperHex};
 use std::{ffi::CStr, marker::PhantomData, os::raw::c_char};
 
 use futures::{Async, Future, Poll};
@@ -18,7 +19,7 @@ use crate::{
 };
 
 #[repr(transparent)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Display, PartialEq, Eq, Hash, UpperHex, LowerHex)]
 pub struct Item(pub u64);
 
 #[repr(transparent)]
